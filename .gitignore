@@ -1,0 +1,21 @@
+# Local Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Local database and secrets
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

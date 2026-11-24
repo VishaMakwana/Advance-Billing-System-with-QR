@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in | Billwise</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; background: radial-gradient(circle at 80% 10%, #dff5ee, transparent 30%), #f4f7fb; color: #172b4d; }
+        .login-card { max-width: 440px; border: 0; border-radius: 22px; box-shadow: 0 24px 70px #19345216; }
+        .brand-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: #146c5b; font-weight: 800; font-size: 1.2rem; }
+        .form-control { min-height: 48px; border-color: #dce5ed; border-radius: 10px; }
+        .form-control:focus { border-color: #4aa48e; box-shadow: 0 0 0 .2rem #4aa48e22; }
+        .btn-primary { background: #146c5b; border-color: #146c5b; border-radius: 10px; font-weight: 700; }
+        .btn-primary:hover { background: #105649; border-color: #105649; }
+        .account-link { color: #146c5b; font-weight: 600; text-decoration: none; }
+        .account-link:hover { color: #105649; text-decoration: underline; }
+    </style>
+</head>
+<body class="d-flex align-items-center justify-content-center p-3">
+<main class="card login-card p-4 p-md-5 w-100">
+    <div class="brand-mark mb-4">B</div>
+    <div class="text-uppercase small text-success fw-bold">Billwise billing</div>
+    <h1 class="h2 fw-bold mt-2 mb-1">Welcome back</h1>
+    <p class="text-secondary mb-4">Sign in to continue to your workspace.</p>
+
+    {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} py-2">{{ message }}</div>
+    {% endfor %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="username">Username</label>
+            <input id="username" type="text" name="username" class="form-control" autocomplete="username" required>
+        </div>
+        <div class="mb-4">
+            <label class="form-label fw-semibold" for="password">Password</label>
+            <input id="password" type="password" name="password" class="form-control" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2">Sign in</button>
+    </form>
+    <div class="d-flex flex-wrap justify-content-center align-items-center column-gap-2 row-gap-1 text-center small mt-4">
+        <span class="text-secondary">New to Billwise?</span>
+        <a class="account-link" href="{% url 'home' %}">Create an account</a>
+        <span class="text-secondary" aria-hidden="true">·</span>
+        <a class="account-link" href="{% url 'password_reset' %}">Forgot password?</a>
+    </div>
+</main>
+</body>
+</html>
