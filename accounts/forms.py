@@ -1,9 +1,28 @@
 from django import forms
+from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from .models import Invoice
+
+
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "username", "email"]
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control", "autocomplete": "given-name"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control", "autocomplete": "family-name"}),
+            "username": forms.TextInput(attrs={"class": "form-control", "autocomplete": "username"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "autocomplete": "email"}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+            raise ValidationError("An account with this email address already exists.")
+        return email
 
 
 class RegisterForm(forms.ModelForm):
@@ -96,3 +115,32 @@ class InvoiceForm(forms.ModelForm):
             ),
             "due_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
         }
+
+
+class PasswordResetRequestForm(forms.Form):
+    email = forms.EmailField(
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "you@example.com",
+                "autocomplete": "email",
+            }
+        )
+    )
+
+
+class PasswordResetOTPForm(forms.Form):
+    otp = forms.RegexField(
+        regex=r"\A\d{6}\Z",
+        error_messages={"invalid": "Enter the 6-digit code sent to your email."},
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control otp-input",
+                "placeholder": "000000",
+                "inputmode": "numeric",
+                "autocomplete": "one-time-code",
+                "maxlength": "6",
+                "pattern": "[0-9]{6}",
+            }
+        ),
+    )

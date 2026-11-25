@@ -14,6 +14,9 @@
         .detail { border-bottom: 1px solid #edf1f4; padding: 1rem 0; }
         .detail:last-child { border-bottom: 0; }
         .detail-label { color: #718096; font-size: .82rem; }
+        .form-control { border-color: #dce5ed; border-radius: 10px; }
+        .form-control:focus { border-color: #4aa48e; box-shadow: 0 0 0 .2rem #4aa48e22; }
+        .errorlist { color: #b42318; font-size: .85rem; list-style: none; margin: .35rem 0 0; padding: 0; }
     </style>
 </head>
 <body>
@@ -40,30 +43,33 @@
                         <div class="text-secondary">{{ user.email }}</div>
                     </div>
                 </div>
-                <div class="row g-4">
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">First name</div><div class="fw-semibold">{{ user.first_name|default:"Not provided" }}</div></div>
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div>
+                {% endfor %}
+                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        {% for field in form %}
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {{ field.errors }}
+                            </div>
+                        {% endfor %}
+                        <div class="col-sm-6">
+                            <div class="detail"><div class="detail-label">Role</div><div class="fw-semibold">{{ profile.get_role_display }}</div></div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="detail"><div class="detail-label">Member since</div><div class="fw-semibold">{{ user.date_joined|date:"F j, Y" }}</div></div>
+                        </div>
                     </div>
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">Last name</div><div class="fw-semibold">{{ user.last_name|default:"Not provided" }}</div></div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button class="btn btn-success px-4" type="submit">Save changes</button>
+                        <a class="btn btn-light" href="{% url 'distributor_dashboard' %}">Back to dashboard</a>
                     </div>
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">Username</div><div class="fw-semibold">{{ user.username }}</div></div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">Email address</div><div class="fw-semibold">{{ user.email|default:"Not provided" }}</div></div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">Role</div><div class="fw-semibold">{{ profile.get_role_display }}</div></div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="detail"><div class="detail-label">Member since</div><div class="fw-semibold">{{ user.date_joined|date:"F j, Y" }}</div></div>
-                    </div>
-                </div>
-                <div class="d-flex gap-2 mt-4">
-                    <a class="btn btn-success px-4" href="{% url 'invoice_create' %}">Create invoice</a>
-                    <a class="btn btn-light" href="{% url 'distributor_dashboard' %}">Back to dashboard</a>
-                </div>
+                </form>
             </section>
         </div>
     </div>

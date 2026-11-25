@@ -1,4 +1,5 @@
 import re
+import time
 
 from django.core import mail
 from django.contrib.auth.models import User
@@ -80,27 +81,35 @@ class PasswordResetTests(TestCase):
             response.content.index(b"Forgot password?"),
         )
 
-    def test_password_reset_email_link_changes_password(self):
+    def request_code(self, email=None):
         response = self.client.post(
             reverse("password_reset"),
-            {"email": self.user.email},
+            {"email": email or self.user.email},
             follow=True,
         )
+        return response
+
+    def test_password_reset_otp_sets_a_new_password(self):
+        response = self.request_code()
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Check your inbox")
+        self.assertContains(response, "6-digit code")
+        self.assertContains(response, "Resend code")
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Reset your Billwise password", mail.outbox[0].subject)
+        self.assertIn("Your Billwise password reset code", mail.outbox[0].subject)
 
-        reset_path = re.search(r"http://testserver(/reset/\S+)", mail.outbox[0].body).group(1)
-        reset_response = self.client.get(reset_path, follow=True)
-        self.assertContains(reset_response, "Create a new password")
-        self.assertContains(reset_response, "New password")
-        self.assertContains(reset_response, "Confirm new password")
-        confirm_path = reset_response.request["PATH_INFO"]
+        code = re.search(r"code is (\d{6})", mail.outbox[0].body).group(1)
+        response = self.client.post(
+            reverse("password_reset_verify"),
+            {"otp": code},
+            follow=True,
+        )
+        self.assertContains(response, "Create a new password")
+        self.assertContains(response, "New password")
+        self.assertContains(response, "Confirm new password")
 
         response = self.client.post(
-            confirm_path,
+            reverse("password_reset_new_password"),
             {
                 "new_password1": "New-S9!ample-Password",
                 "new_password2": "New-S9!ample-Password",
@@ -108,19 +117,68 @@ class PasswordResetTests(TestCase):
             follow=True,
         )
 
-        self.assertContains(response, "Password updated")
+        self.assertContains(response, "Your password was reset. Please sign in.")
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("New-S9!ample-Password"))
 
     def test_unknown_email_does_not_disclose_account_existence(self):
+        response = self.request_code(email="unknown@example.com")
+
+        self.assertContains(response, "6-digit code")
+        self.assertContains(response, "If an account exists for that email")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_invalid_otp_is_limited_and_expires(self):
+        self.request_code()
+        for _ in range(5):
+            response = self.client.post(
+                reverse("password_reset_verify"),
+                {"otp": "abcdef"},
+                follow=True,
+            )
+
+        self.assertContains(response, "Too many incorrect attempts")
+        self.assertNotIn("password_reset_otp", self.client.session)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("S9!ample-Long-Password"))
+
+    def test_resend_obeys_cooldown_and_sends_a_fresh_code(self):
+        self.request_code()
+        first_code = re.search(r"code is (\d{6})", mail.outbox[0].body).group(1)
+
+        response = self.client.post(reverse("password_reset_resend"), follow=True)
+        self.assertContains(response, "Please wait")
+        self.assertEqual(len(mail.outbox), 1)
+
+        session = self.client.session
+        state = session["password_reset_otp"]
+        state["sent_at"] = time.time() - 61
+        session["password_reset_otp"] = state
+        session.save()
+
+        response = self.client.post(reverse("password_reset_resend"), follow=True)
+        self.assertContains(response, "Resend code")
+        self.assertEqual(len(mail.outbox), 2)
+        second_code = re.search(r"code is (\d{6})", mail.outbox[1].body).group(1)
+        self.assertNotEqual(first_code, second_code)
+
+    def test_password_confirmation_must_match(self):
+        self.request_code()
+        code = re.search(r"code is (\d{6})", mail.outbox[0].body).group(1)
+        self.client.post(reverse("password_reset_verify"), {"otp": code})
+
         response = self.client.post(
-            reverse("password_reset"),
-            {"email": "unknown@example.com"},
-            follow=True,
+            reverse("password_reset_new_password"),
+            {
+                "new_password1": "New-S9!ample-Password",
+                "new_password2": "Different-S9!ample-Password",
+            },
         )
 
-        self.assertContains(response, "Check your inbox")
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "The two password fields didn’t match")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("S9!ample-Long-Password"))
 
 
 class DistributorAndInvoiceTests(TestCase):
@@ -143,6 +201,47 @@ class DistributorAndInvoiceTests(TestCase):
         self.assertContains(response, "Ravi Shah")
         self.assertContains(response, "distributor@example.com")
         self.assertContains(response, "Distributor")
+
+    def test_distributor_can_update_profile_fields(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("distributor_profile"),
+            {
+                "first_name": "Asha",
+                "last_name": "Desai",
+                "username": "asha",
+                "email": "asha@example.com",
+            },
+        )
+
+        self.assertRedirects(response, reverse("distributor_profile"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Asha")
+        self.assertEqual(self.user.last_name, "Desai")
+        self.assertEqual(self.user.username, "asha")
+        self.assertEqual(self.user.email, "asha@example.com")
+
+    def test_distributor_profile_rejects_invalid_or_duplicate_email(self):
+        User.objects.create_user(username="other", email="used@example.com")
+        self.client.force_login(self.user)
+        original_email = self.user.email
+
+        for email in ("not-an-email", "USED@example.com"):
+            response = self.client.post(
+                reverse("distributor_profile"),
+                {
+                    "first_name": "Asha",
+                    "last_name": "Desai",
+                    "username": "asha",
+                    "email": email,
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("email", response.context["form"].errors)
+            self.user.refresh_from_db()
+            self.assertEqual(self.user.email, original_email)
 
     def test_dashboard_shows_recent_invoice_and_navigation(self):
         Invoice.objects.create(
