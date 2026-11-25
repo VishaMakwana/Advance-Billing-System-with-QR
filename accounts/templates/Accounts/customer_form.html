@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Add customer | Billwise</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; background: #f4f7fb; color: #172b4d; }
+        .topbar, .form-card { background: #fff; border: 1px solid #e8edf2; border-radius: 18px; }
+        .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: #146c5b; font-weight: 800; }
+        .form-control { border-color: #dce5ed; border-radius: 10px; }
+        .form-control:focus { border-color: #4aa48e; box-shadow: 0 0 0 .2rem #4aa48e22; }
+        .btn-success { background: #146c5b; border-color: #146c5b; }
+        .btn-success:hover { background: #105649; border-color: #105649; }
+        .errorlist { color: #b42318; font-size: .85rem; list-style: none; margin: .35rem 0 0; padding: 0; }
+    </style>
+</head>
+<body>
+<main class="container py-4 py-lg-5">
+    <header class="topbar d-flex justify-content-between align-items-center px-3 px-md-4 py-3 mb-4">
+        <a href="{% url 'distributor_dashboard' %}" class="d-flex align-items-center gap-2 text-decoration-none text-dark">
+            <span class="brand-mark">B</span><span class="fw-bold">Billwise</span>
+        </a>
+        <nav class="d-flex gap-2">
+            <a class="btn btn-sm btn-light" href="{% url 'distributor_dashboard' %}">Dashboard</a>
+            <a class="btn btn-sm btn-light" href="{% url 'invoices' %}">Invoices</a>
+        </nav>
+    </header>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <section class="form-card p-4 p-md-5">
+                <div class="small text-uppercase text-success fw-semibold">Customer details</div>
+                <h1 class="h2 fw-bold mt-2">Add a customer</h1>
+                <p class="text-secondary mb-4">Save contact details for a customer you bill.</p>
+
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}" role="alert">{{ message }}</div>
+                {% endfor %}
+                {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        {% for field in form %}
+                            <div class="{% if field.name == 'address' %}col-12{% else %}col-md-6{% endif %}">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                                {{ field.errors }}
+                            </div>
+                        {% endfor %}
+                        <div class="col-12 d-flex gap-2 mt-4">
+                            <button class="btn btn-success px-4" type="submit">Save customer</button>
+                            <a class="btn btn-light px-4" href="{% url 'distributor_dashboard' %}">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
+</main>
+</body>
+</html>

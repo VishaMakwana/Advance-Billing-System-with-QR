@@ -4,7 +4,27 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from .models import Invoice
+from .models import Customer, Invoice
+
+
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ["name", "email", "phone", "address"]
+        widgets = {
+            "name": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Customer or business name"}
+            ),
+            "email": forms.EmailInput(
+                attrs={"class": "form-control", "placeholder": "name@example.com", "autocomplete": "email"}
+            ),
+            "phone": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Phone number", "autocomplete": "tel"}
+            ),
+            "address": forms.Textarea(
+                attrs={"class": "form-control", "placeholder": "Street, city, and postal code", "rows": 3}
+            ),
+        }
 
 
 class ProfileForm(forms.ModelForm):
@@ -55,8 +75,9 @@ class RegisterForm(forms.ModelForm):
         ),
     )
     role = forms.ChoiceField(
-        choices=[("DISTRIBUTOR", "Distributor")],
+        choices=[("DISTRIBUTOR", "Distributor"), ("CUSTOMER", "Customer")],
         widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Choose Distributor to create invoices or Customer to access the customer dashboard.",
     )
 
     class Meta:

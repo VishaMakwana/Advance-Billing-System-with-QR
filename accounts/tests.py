@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .forms import RegisterForm
-from .models import Invoice, Profile
+from .models import Customer, Invoice, Profile
 
 
 class RegisterFormTests(TestCase):
@@ -34,6 +34,28 @@ class RegisterFormTests(TestCase):
         self.assertTrue(user.check_password("S9!ample-Long-Password"))
         self.assertEqual(user.email, "maya@example.com")
         self.assertEqual(user.profile.role, Profile.ROLE_CHOICES[1][0])
+
+    def test_customer_registration_then_login_opens_customer_dashboard(self):
+        response = self.client.post(
+            reverse("home"),
+            self.registration_data(role="CUSTOMER"),
+            follow=True,
+        )
+
+        self.assertEqual(response.redirect_chain, [(reverse("login"), 302)])
+        self.assertContains(response, "Your account is ready. Please log in.")
+        user = User.objects.get(username="maya")
+        self.assertEqual(user.profile.role, "CUSTOMER")
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": "maya", "password": "S9!ample-Long-Password"},
+            follow=True,
+        )
+
+        self.assertEqual(response.redirect_chain, [(reverse("customer_dashboard"), 302)])
+        self.assertContains(response, "Customer dashboard")
+        self.assertContains(response, "maya@example.com")
 
     def test_registration_rejects_bad_email_short_password_and_mismatch(self):
         form = RegisterForm(
@@ -314,3 +336,86 @@ class DistributorAndInvoiceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Private Customer")
+
+
+class CustomerModelTests(TestCase):
+    def test_customer_contact_details_are_saved_for_their_distributor(self):
+        distributor = User.objects.create_user(username="customer-owner")
+
+        customer = Customer.objects.create(
+            user=distributor,
+            name="Northwind Store",
+            email="billing@northwind.example",
+            phone="+1 555 0100",
+            address="42 Market Street",
+        )
+
+        saved_customer = Customer.objects.get(pk=customer.pk)
+        self.assertEqual(saved_customer.user, distributor)
+        self.assertEqual(saved_customer.name, "Northwind Store")
+        self.assertEqual(saved_customer.email, "billing@northwind.example")
+        self.assertEqual(saved_customer.phone, "+1 555 0100")
+        self.assertEqual(saved_customer.address, "42 Market Street")
+
+
+class CustomerCreateViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="customer-distributor")
+        self.client.force_login(self.user)
+
+    def test_customer_form_saves_for_current_user_and_shows_success_alert(self):
+        response = self.client.post(
+            reverse("customer_create"),
+            {
+                "name": "Northwind Store",
+                "email": "billing@northwind.example",
+                "phone": "+1 555 0100",
+                "address": "42 Market Street",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain, [(reverse("customer_create"), 302)])
+        self.assertContains(response, "Customer added successfully.")
+        customer = Customer.objects.get(name="Northwind Store")
+        self.assertEqual(customer.user, self.user)
+        self.assertEqual(customer.email, "billing@northwind.example")
+        self.assertEqual(customer.phone, "+1 555 0100")
+        self.assertEqual(customer.address, "42 Market Street")
+
+    def test_customer_form_rejects_missing_name_and_invalid_email(self):
+        response = self.client.post(
+            reverse("customer_create"),
+            {
+                "name": "",
+                "email": "not-an-email",
+                "phone": "555-0100",
+                "address": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("name", response.context["form"].errors)
+        self.assertIn("email", response.context["form"].errors)
+        self.assertContains(response, "Enter a valid email address.")
+        self.assertEqual(Customer.objects.count(), 0)
+
+
+class CustomerDashboardAccessTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="customer-user")
+        Profile.objects.create(user=self.user, role="CUSTOMER")
+        self.client.force_login(self.user)
+
+    def test_customer_cannot_open_distributor_invoice_pages(self):
+        response = self.client.get(reverse("invoices"))
+
+        self.assertRedirects(response, reverse("customer_dashboard"))
+        response = self.client.get(reverse("invoice_create"))
+        self.assertRedirects(response, reverse("customer_dashboard"))
+
+    def test_customer_dashboard_shows_customer_account(self):
+        response = self.client.get(reverse("customer_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Customer account")

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Invoice, Profile
+from .models import Customer, Invoice, Profile
 
 
 @admin.register(Profile)
@@ -8,6 +8,13 @@ class ProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "role")
     list_filter = ("role",)
     search_fields = ("user__username", "user__email")
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "phone", "user", "created_at")
+    search_fields = ("name", "email", "phone", "user__username")
+    list_filter = ("created_at",)
 
 
 @admin.register(Invoice)

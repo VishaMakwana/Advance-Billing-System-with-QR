@@ -12,6 +12,7 @@ from django.shortcuts import redirect, render
 from django.utils.crypto import constant_time_compare, salted_hmac
 
 from .forms import (
+    CustomerForm,
     InvoiceForm,
     PasswordResetOTPForm,
     PasswordResetRequestForm,
@@ -260,20 +261,31 @@ def _send_password_reset_otp(request, email, user, previous_state=None):
 def redirect_by_role(user):
     if _is_admin(user):
         return redirect("admin_dashboard")
+    if _is_customer(user):
+        return redirect("customer_dashboard")
     return redirect("distributor_dashboard")
 
 
 @login_required
 def admin_dashboard(request):
     if not _is_admin(request.user):
-        return redirect("distributor_dashboard")
+        return redirect_by_role(request.user)
     return render(request, "Accounts/admin_dashboard.html")
+
+
+@login_required
+def customer_dashboard(request):
+    if not _is_customer(request.user):
+        return redirect_by_role(request.user)
+    return render(request, "Accounts/customer_dashboard.html")
 
 
 @login_required
 def distributor_dashboard(request):
     if _is_admin(request.user):
         return redirect("admin_dashboard")
+    if _is_customer(request.user):
+        return redirect("customer_dashboard")
     invoices = Invoice.objects.filter(user=request.user)
     return render(
         request,
@@ -286,6 +298,8 @@ def distributor_dashboard(request):
 def distributor_profile(request):
     if _is_admin(request.user):
         return redirect("admin_dashboard")
+    if _is_customer(request.user):
+        return redirect("customer_dashboard")
     profile, _ = Profile.objects.get_or_create(user=request.user)
     form = ProfileForm(request.POST or None, instance=request.user)
     if request.method == "POST" and form.is_valid():
@@ -303,14 +317,34 @@ def distributor_profile(request):
 def invoice_list(request):
     if _is_admin(request.user):
         return redirect("admin_dashboard")
+    if _is_customer(request.user):
+        return redirect("customer_dashboard")
     invoices = Invoice.objects.filter(user=request.user)
     return render(request, "Accounts/invoices.html", {"invoices": invoices})
+
+
+@login_required
+def customer_create(request):
+    if _is_admin(request.user):
+        return redirect("admin_dashboard")
+    if _is_customer(request.user):
+        return redirect("customer_dashboard")
+    form = CustomerForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        customer = form.save(commit=False)
+        customer.user = request.user
+        customer.save()
+        messages.success(request, "Customer added successfully.")
+        return redirect("customer_create")
+    return render(request, "Accounts/customer_form.html", {"form": form})
 
 
 @login_required
 def invoice_create(request):
     if _is_admin(request.user):
         return redirect("admin_dashboard")
+    if _is_customer(request.user):
+        return redirect("customer_dashboard")
     form = InvoiceForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         invoice = form.save(commit=False)
@@ -325,6 +359,10 @@ def _is_admin(user):
     return user.is_superuser or (
         hasattr(user, "profile") and user.profile.role == "ADMIN"
     )
+
+
+def _is_customer(user):
+    return hasattr(user, "profile") and user.profile.role == "CUSTOMER"
 
 
 def custom_logout(request):

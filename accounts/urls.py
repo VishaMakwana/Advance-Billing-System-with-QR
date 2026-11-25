@@ -18,8 +18,10 @@ urlpatterns = [
     ),
     path("logout/", views.custom_logout, name="logout"),
     path("admin-dashboard/", views.admin_dashboard, name="admin_dashboard"),
+    path("customer-dashboard/", views.customer_dashboard, name="customer_dashboard"),
     path("distributor-dashboard/", views.distributor_dashboard, name="distributor_dashboard"),
     path("distributor-profile/", views.distributor_profile, name="distributor_profile"),
+    path("customers/new/", views.customer_create, name="customer_create"),
     path("invoices/", views.invoice_list, name="invoices"),
     path("invoices/new/", views.invoice_create, name="invoice_create"),
 ]
